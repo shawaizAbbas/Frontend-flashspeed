@@ -1,1 +1,302 @@
-# Frontend-flashspeed
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flashspeed Elite</title>
+    <!-- Firebase Library -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+    <style>
+        :root {
+            --bg: #050510; --panel: #111125; --neon: #00f2ff; --green: #39ff14; --yellow: #fff200; --red: #ff0055; --text: #fff;
+        }
+        body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; }
+        
+        /* Login Screen Styles */
+        #login-screen {
+            height: 100vh; display: flex; justify-content: center; align-items: center; background: radial-gradient(circle, #111125 0%, #050510 100%);
+        }
+        .login-box {
+            background: var(--panel); padding: 40px; border-radius: 20px; border: 2px solid var(--neon); width: 320px; text-align: center;
+            box-shadow: 0 0 30px rgba(0, 242, 255, 0.2);
+        }
+        .contact-card { background: #000; padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 1px dashed var(--neon); }
+        .login-box input { width: 100%; padding: 12px; margin: 10px 0; background: #000; border: 1px solid #333; color: #fff; border-radius: 5px; box-sizing: border-box; }
+        .btn-login { width: 100%; padding: 15px; background: var(--neon); border: none; border-radius: 5px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+
+        /* Game UI Styles */
+        #game-screen { display: none; }
+        .main-wrapper { width: 100%; max-width: 1100px; display: grid; grid-template-columns: 280px 1fr; gap: 15px; padding: 15px; margin: auto; height: 95vh; box-sizing: border-box; }
+        
+        .lobby { background: var(--panel); border-radius: 15px; padding: 15px; overflow-y: hidden; display: flex; flex-direction: column; border: 1px solid #222; }
+        .lobby-title { font-size: 0.9rem; font-weight: bold; color: var(--neon); margin-bottom: 10px; text-transform: uppercase; border-bottom: 1px solid #333; padding-bottom: 5px; }
+        .player-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #1a1a35; font-size: 0.8rem; }
+        .p-avatar { width: 30px; height: 30px; background: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 15px; }
+        .p-info { flex: 1; }
+        .p-cashout { color: var(--green); font-weight: bold; }
+
+        .game-column { display: flex; flex-direction: column; gap: 15px; }
+        .header { display: flex; justify-content: space-between; align-items: center; background: var(--panel); padding: 10px 20px; border-radius: 15px; }
+        .balance-box { color: var(--green); font-weight: bold; font-size: 1.2rem; }
+        .nav-btns button { background: #1a1a35; border: 1px solid var(--neon); color: #fff; padding: 5px 15px; border-radius: 5px; cursor: pointer; margin-left: 5px; font-size: 0.8rem; }
+
+        #viewport { height: 350px; background: #000; border-radius: 20px; position: relative; overflow: hidden; border: 2px solid #1f1f35; }
+        .sky { position: absolute; width: 100%; height: 200%; background-image: radial-gradient(#ffffff22 1px, transparent 1px); background-size: 50px 50px; }
+        #multiplier { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); font-size: 5rem; font-weight: 900; z-index: 10; }
+        #craft { position: absolute; font-size: 50px; left: 20%; bottom: 30%; z-index: 5; display: none; }
+
+        .history-bar { display: flex; gap: 5px; height: 30px; overflow: hidden; margin-bottom: 5px; }
+        .hist-item { background: #1a1a35; padding: 2px 10px; border-radius: 20px; font-size: 0.75rem; border: 1px solid #333; }
+
+        .bet-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .panel { background: var(--panel); padding: 15px; border-radius: 15px; border-bottom: 4px solid #000; position: relative; }
+        .btn { width: 100%; height: 60px; border-radius: 10px; border: none; font-weight: bold; font-size: 1.2rem; cursor: pointer; text-transform: uppercase; margin-top: 10px; }
+        .btn-bet { background: var(--green); color: #000; }
+        .btn-cash { background: var(--yellow); color: #000; }
+        .btn-cancel { background: var(--red); color: #fff; }
+        .btn-wait { background: #222; color: #555; cursor: not-allowed; }
+
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 100; justify-content: center; align-items: center; }
+        .modal-content { background: var(--panel); padding: 30px; border-radius: 20px; border: 2px solid var(--neon); text-align: center; max-width: 400px; }
+
+        .phase-ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 20; display: none; flex-direction: column; justify-content: center; align-items: center; }
+        .p-bar-bg { width: 200px; height: 5px; background: #333; margin-top: 10px; }
+        #p-bar { width: 100%; height: 100%; background: var(--yellow); }
+    </style>
+</head>
+<body>
+
+<!-- LOGIN VIEW -->
+<div id="login-screen">
+    <div class="login-box">
+        <h1 style="color:var(--neon); margin-top:0;">FLASHSPEED</h1>
+        <div class="contact-card">
+            <div style="font-size: 0.7rem; color: #888;">CONTACT AGENT FOR ACCOUNT</div>
+            <div style="font-size: 1.3rem; color: var(--neon); font-weight: bold;">00923426693085</div>
+        </div>
+        <input type="text" id="login-user" placeholder="Username">
+        <input type="password" id="login-pass" placeholder="Password">
+        <button class="btn-login" onclick="attemptLogin()">LOGIN</button>
+    </div>
+</div>
+
+<!-- GAME VIEW -->
+<div id="game-screen">
+    <div class="main-wrapper">
+        <div class="lobby">
+            <div class="lobby-title">Live Bets</div>
+            <div id="player-list"></div>
+        </div>
+
+        <div class="game-column">
+            <div class="header">
+                <div style="font-weight: 900; color: var(--neon);" id="current-user-display">PLAYER</div>
+                <div class="balance-box">$<span id="balance">0.00</span></div>
+                <div class="nav-btns">
+                    <button onclick="showModal('ADD FUNDS')">ADD FUND</button>
+                    <button onclick="showModal('WITHDRAW')">WITHDRAW</button>
+                </div>
+            </div>
+
+            <div class="history-bar" id="history"></div>
+
+            <div id="viewport">
+                <div class="sky" id="sky"></div>
+                <div id="multiplier">1.00x</div>
+                <div id="craft">🚀</div>
+                <div class="phase-ui" id="phase-ui">
+                    <div style="letter-spacing: 2px;">PREPARING NEXT ROUND</div>
+                    <div class="p-bar-bg"><div id="p-bar"></div></div>
+                </div>
+            </div>
+
+            <div class="bet-grid">
+                <div class="panel" id="panel-1">
+                    <input type="number" id="amt-1" value="10" style="width:100%; background:#000; border:1px solid #333; color:#fff; padding:8px; border-radius:5px;">
+                    <button id="btn-1" class="btn btn-bet" onclick="handleInput(1)">BET</button>
+                </div>
+                <div class="panel" id="panel-2">
+                    <input type="number" id="amt-2" value="10" style="width:100%; background:#000; border:1px solid #333; color:#fff; padding:8px; border-radius:5px;">
+                    <button id="btn-2" class="btn btn-bet" onclick="handleInput(2)">BET</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- POPUP MODAL -->
+<div class="modal" id="modal">
+    <div class="modal-content">
+        <h2 id="modal-title"></h2>
+        <p>To process your request, please contact our official agent:</p>
+        <h1 style="color: var(--neon); letter-spacing: 1px;">00923426693085</h1>
+        <p>WhatsApp | Viber | Telegram</p>
+        <button onclick="hideModal()" style="margin-top:20px; padding:10px 20px; background:var(--red); border:none; color:#fff; border-radius:5px; cursor:pointer;">CLOSE</button>
+    </div>
+</div>
+
+<script>
+    // --- FIREBASE CONFIG (REQUIRED) ---
+    const firebaseConfig = {
+        apiKey: "PASTE_YOUR_API_KEY",
+        databaseURL: "PASTE_YOUR_DB_URL",
+        projectId: "PASTE_YOUR_PROJECT_ID",
+        appId: "PASTE_YOUR_APP_ID"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // --- GAME VARIABLES ---
+    let currentUser = null;
+    let wallet = 0;
+    let multiplier = 1.00;
+    let gamePhase = "IDLE";
+    let crashPoint = 0;
+    let engine;
+    let playerBets = { 1: { state: "NONE", amount: 0 }, 2: { state: "NONE", amount: 0 } };
+    
+    const names = ["John", "Ahmed", "Sergey", "Elena", "Xing", "Ali", "Marco", "Sami"];
+    const icons = ["👤", "👨", "🧑", "👩", "🧔"];
+
+    // --- LOGIN LOGIC ---
+    function attemptLogin() {
+        const u = document.getElementById('login-user').value;
+        const p = document.getElementById('login-pass').value;
+
+        db.ref('users/' + u).once('value', (snap) => {
+            const data = snap.val();
+            if(data && data.password === p) {
+                currentUser = u;
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('game-screen').style.display = 'block';
+                document.getElementById('current-user-display').innerText = u.toUpperCase();
+                
+                // Sync Balance
+                db.ref('users/' + u + '/balance').on('value', (s) => {
+                    wallet = s.val() || 0;
+                    document.getElementById('balance').innerText = wallet.toFixed(2);
+                });
+
+                startPreparing();
+            } else {
+                alert("Account not found. Contact 00923426693085");
+            }
+        });
+    }
+
+    // --- GAME ENGINE ---
+    function startPreparing() {
+        gamePhase = "PREPARING";
+        document.getElementById('phase-ui').style.display = 'flex';
+        document.getElementById('multiplier').innerText = "1.00x";
+        document.getElementById('multiplier').style.color = "#fff";
+        document.getElementById('craft').style.display = 'none';
+        
+        // Reset lobby player states
+        const list = document.getElementById('player-list');
+        list.innerHTML = '';
+        for(let i=0; i<8; i++) {
+            list.innerHTML += `<div class="player-row"><div class="p-avatar">${icons[Math.floor(Math.random()*icons.length)]}</div><div class="p-info">${names[Math.floor(Math.random()*names.length)]}</div><div class="p-bet">$${(Math.random()*50).toFixed(2)}</div></div>`;
+        }
+
+        let timeLeft = 5000;
+        let pTimer = setInterval(() => {
+            timeLeft -= 50;
+            document.getElementById('p-bar').style.width = (timeLeft / 5000 * 100) + "%";
+            if (timeLeft <= 0) { clearInterval(pTimer); launch(); }
+        }, 50);
+    }
+
+    function launch() {
+        gamePhase = "FLYING";
+        document.getElementById('phase-ui').style.display = 'none';
+        const craft = document.getElementById('craft');
+        craft.style.display = 'block';
+        craft.style.transition = 'none';
+        craft.style.left = '20%'; craft.style.bottom = '30%';
+        
+        multiplier = 1.00;
+        crashPoint = (0.98 / (1 - Math.random())).toFixed(2);
+        if (crashPoint < 1.01) crashPoint = 1.01;
+
+        // Activate queued bets
+        for (let i = 1; i <= 2; i++) { 
+            if (playerBets[i].state === "QUEUED") playerBets[i].state = "ACTIVE"; 
+            updateUI(i); 
+        }
+
+        let bgY = 0;
+        engine = setInterval(() => {
+            multiplier += (multiplier * 0.005) + 0.01;
+            document.getElementById('multiplier').innerText = multiplier.toFixed(2) + "x";
+            
+            bgY += (multiplier * 4);
+            document.getElementById('sky').style.backgroundPosition = `0 ${bgY}px`;
+            
+            // Randomly "Cash out" fake players
+            if(Math.random() < 0.04) {
+                const rows = document.querySelectorAll('.player-row');
+                const randomRow = rows[Math.floor(Math.random()*rows.length)];
+                if(randomRow && !randomRow.innerHTML.includes('p-cashout')) {
+                    randomRow.innerHTML += `<div class="p-cashout">${multiplier.toFixed(2)}x</div>`;
+                }
+            }
+
+            if (multiplier >= crashPoint) crash();
+        }, 50);
+    }
+
+    function handleInput(num) {
+        const amt = parseFloat(document.getElementById(`amt-${num}`).value);
+        if (playerBets[num].state === "NONE") {
+            if (amt > wallet || amt <= 0) return alert("Low balance! Contact 00923426693085");
+            db.ref('users/' + currentUser + '/balance').set(wallet - amt);
+            playerBets[num] = { state: "QUEUED", amount: amt };
+        } else if (playerBets[num].state === "QUEUED") {
+            db.ref('users/' + currentUser + '/balance').set(wallet + playerBets[num].amount);
+            playerBets[num].state = "NONE";
+        } else if (playerBets[num].state === "ACTIVE") {
+            let win = playerBets[num].amount * multiplier;
+            db.ref('users/' + currentUser + '/balance').set(wallet + win);
+            playerBets[num].state = "WON";
+            playerBets[num].winAmount = win;
+        }
+        updateUI(num);
+    }
+
+    function updateUI(num) {
+        const btn = document.getElementById(`btn-${num}`);
+        const s = playerBets[num].state;
+        if (s === "NONE") { btn.innerText = "BET"; btn.className = "btn btn-bet"; btn.disabled = false; }
+        else if (s === "QUEUED") { btn.innerText = "CANCEL"; btn.className = "btn btn-cancel"; }
+        else if (s === "ACTIVE") { btn.innerText = "CASH OUT"; btn.className = "btn btn-cash"; }
+        else { btn.innerText = `WON $${playerBets[num].winAmount.toFixed(2)}`; btn.className = "btn btn-wait"; btn.disabled = true; }
+    }
+
+    function crash() {
+        clearInterval(engine);
+        gamePhase = "CRASHED";
+        document.getElementById('multiplier').innerText = "FLEW AWAY";
+        document.getElementById('multiplier').style.color = "var(--red)";
+        const craft = document.getElementById('craft');
+        craft.style.transition = "all 0.6s ease-in"; craft.style.left = "150%"; craft.style.bottom = "100%";
+
+        const hist = document.getElementById('history');
+        const item = document.createElement('div'); item.className = 'hist-item'; item.innerText = parseFloat(crashPoint).toFixed(2) + "x";
+        hist.prepend(item);
+
+        setTimeout(() => {
+            for(let i=1; i<=2; i++) { 
+                if(playerBets[i].state !== "QUEUED") playerBets[i].state = "NONE";
+                updateUI(i); 
+            }
+            startPreparing();
+        }, 2500);
+    }
+
+    function showModal(t) { document.getElementById('modal-title').innerText = t; document.getElementById('modal').style.display = 'flex'; }
+    function hideModal() { document.getElementById('modal').style.display = 'none'; }
+</script>
+</body>
+</html>
